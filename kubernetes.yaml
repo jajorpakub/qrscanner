@@ -28,8 +28,8 @@ metadata:
   namespace: qrscanner
 type: Opaque
 stringData:
-  DB_PASSWORD: "change-me-secure-password"
-  JWT_SECRET: "change-me-secure-jwt-secret-min-32-chars"
+  DB_PASSWORD: "KochamGabi14"
+  JWT_SECRET: "super-secret-jwt-key-at-least-32-characters-long-2026"
 
 ---
 apiVersion: v1
@@ -208,7 +208,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: your-registry/qrscanner-backend:latest
+        image: pakubjajor/qrscanner-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 9000
@@ -257,7 +257,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/qrscanner-frontend:latest
+        image: pakubjajor/qrscanner-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
