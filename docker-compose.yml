@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: qrscanner_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-password}
+      MYSQL_DATABASE: ${DB_NAME:-qrscanner}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - qrscanner_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: qrscanner_phpmyadmin
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_PASSWORD:-password}
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - qrscanner_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.php
+    container_name: qrscanner_backend
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-qrscanner}
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-me}
+      QR_DOMAIN: ${QR_DOMAIN:-http://localhost}
+      APP_ENV: ${APP_ENV:-development}
+      APP_DEBUG: ${APP_DEBUG:-true}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "9000:9000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - qrscanner_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.nginx
+    container_name: qrscanner_frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost/api}
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    volumes:
+      - ./docker/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - qrscanner_network
+
+volumes:
+  mysql_data:
+
+networks:
+  qrscanner_network:
+    driver: bridge
