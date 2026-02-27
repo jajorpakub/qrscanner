@@ -197,7 +197,7 @@ metadata:
   name: backend
   namespace: qrscanner
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: backend
@@ -246,7 +246,7 @@ metadata:
   name: frontend
   namespace: qrscanner
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
