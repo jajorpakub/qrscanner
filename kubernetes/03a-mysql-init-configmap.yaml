@@ -1,0 +1,54 @@
+---
+# ConfigMap dla MySQL init script
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-script
+  namespace: qrscanner
+data:
+  schema.sql: |
+    CREATE DATABASE IF NOT EXISTS qrscanner;
+    USE qrscanner;
+
+    CREATE TABLE users (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role ENUM('owner', 'technician', 'viewer') DEFAULT 'viewer',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE devices (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(100) NOT NULL,
+        location VARCHAR(255),
+        manufacturer VARCHAR(255),
+        serial_number VARCHAR(255) UNIQUE,
+        install_date DATE,
+        qr_code LONGTEXT,
+        user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user (user_id),
+        INDEX idx_serial (serial_number)
+    );
+
+    CREATE TABLE technical_records (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        device_id INT NOT NULL,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        record_type ENUM('inspection', 'maintenance', 'repair', 'testing') NOT NULL,
+        description TEXT NOT NULL,
+        technician VARCHAR(255),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_device (device_id),
+        INDEX idx_date (record_date)
+    );

@@ -1,0 +1,66 @@
+---
+# PhpMyAdmin Service (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpmyadmin-service
+  namespace: qrscanner
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: phpmyadmin
+
+---
+# PhpMyAdmin Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phpmyadmin
+  namespace: qrscanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phpmyadmin
+  template:
+    metadata:
+      labels:
+        app: phpmyadmin
+    spec:
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: PMA_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: qrscanner-config
+              key: DB_HOST
+        - name: PMA_USER
+          valueFrom:
+            secretKeyRef:
+              name: qrscanner-secrets
+              key: DB_USER
+        - name: PMA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qrscanner-secrets
+              key: DB_PASSWORD
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10

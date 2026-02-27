@@ -1,0 +1,378 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qrscanner
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qrscanner-config
+  namespace: qrscanner
+data:
+  DB_HOST: "mysql"
+  DB_PORT: "3306"
+  DB_NAME: "qrscanner"
+  DB_USER: "root"
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  QR_DOMAIN: "https://qrscanner.local"
+  REACT_APP_API_URL: "https://qrscanner.local/api"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: qrscanner-secrets
+  namespace: qrscanner
+type: Opaque
+stringData:
+  DB_PASSWORD: "change-me-secure-password"
+  JWT_SECRET: "change-me-secure-jwt-secret-min-32-chars"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /mnt/data/qrscanner/mysql
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: qrscanner
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: qrscanner
+spec:
+  clusterIP: None
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: qrscanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qrscanner-secrets
+              key: DB_PASSWORD
+        - name: MYSQL_DATABASE
+          value: "qrscanner"
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+      - name: init-script
+        configMap:
+          name: mysql-init
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: qrscanner
+data:
+  schema.sql: |
+    CREATE DATABASE IF NOT EXISTS qrscanner;
+    USE qrscanner;
+
+    CREATE TABLE users (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        role ENUM('owner', 'technician', 'viewer') DEFAULT 'viewer',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE devices (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(100) NOT NULL,
+        location VARCHAR(255),
+        manufacturer VARCHAR(255),
+        serial_number VARCHAR(255) UNIQUE,
+        install_date DATE,
+        qr_code LONGTEXT,
+        user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_user (user_id),
+        INDEX idx_serial (serial_number)
+    );
+
+    CREATE TABLE technical_records (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        device_id INT NOT NULL,
+        user_id INT NOT NULL,
+        record_date DATE NOT NULL,
+        record_type ENUM('inspection', 'maintenance', 'repair', 'testing') NOT NULL,
+        description TEXT NOT NULL,
+        technician VARCHAR(255),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        INDEX idx_device (device_id),
+        INDEX idx_date (record_date)
+    );
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: qrscanner
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80
+      targetPort: 9000
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: qrscanner
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: your-registry/qrscanner-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9000
+        envFrom:
+        - configMapRef:
+            name: qrscanner-config
+        - secretRef:
+            name: qrscanner-secrets
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: qrscanner
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: qrscanner
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: your-registry/qrscanner-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: REACT_APP_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: qrscanner-config
+              key: REACT_APP_API_URL
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phpmyadmin
+  namespace: qrscanner
+spec:
+  selector:
+    app: phpmyadmin
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phpmyadmin
+  namespace: qrscanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phpmyadmin
+  template:
+    metadata:
+      labels:
+        app: phpmyadmin
+    spec:
+      containers:
+      - name: phpmyadmin
+        image: phpmyadmin:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: PMA_HOST
+          value: "mysql"
+        - name: PMA_USER
+          valueFrom:
+            configMapKeyRef:
+              name: qrscanner-config
+              key: DB_USER
+        - name: PMA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: qrscanner-secrets
+              key: DB_PASSWORD
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qrscanner-ingress
+  namespace: qrscanner
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - qrscanner.local
+    - phpmyadmin.qrscanner.local
+    secretName: qrscanner-tls
+  rules:
+  - host: qrscanner.local
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 80
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+  - host: phpmyadmin.qrscanner.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: phpmyadmin
+            port:
+              number: 80

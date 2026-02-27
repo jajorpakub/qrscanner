@@ -1,0 +1,22 @@
+---
+# Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: qrscanner
+
+---
+# ConfigMap dla zmiennych środowiskowych
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qrscanner-config
+  namespace: qrscanner
+data:
+  DB_HOST: mysql-service
+  DB_PORT: "3306"
+  DB_NAME: qrscanner
+  APP_ENV: production
+  APP_DEBUG: "false"
+  QR_DOMAIN: "https://qrscanner.local"
+  REACT_APP_API_URL: "https://qrscanner.local/api"
