@@ -231,15 +231,14 @@ kind: Service
 metadata:
   name: frontend
   namespace: qrscanner
-spec:
+  spec:
+  type: NodePort
   selector:
     app: frontend
   ports:
     - port: 80
       targetPort: 80
-  type: ClusterIP
-
----
+      nodePort: 30080---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -282,12 +281,13 @@ metadata:
   name: phpmyadmin
   namespace: qrscanner
 spec:
+  type: NodePort
   selector:
     app: phpmyadmin
   ports:
     - port: 80
       targetPort: 80
-  type: ClusterIP
+      nodePort: 30081
 
 ---
 apiVersion: apps/v1
@@ -330,49 +330,3 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "500m"
-
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: qrscanner-ingress
-  namespace: qrscanner
-  annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
-spec:
-  ingressClassName: nginx
-  tls:
-  - hosts:
-    - qrscanner.local
-    - phpmyadmin.qrscanner.local
-    secretName: qrscanner-tls
-  rules:
-  - host: qrscanner.local
-    http:
-      paths:
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: backend
-            port:
-              number: 80
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend
-            port:
-              number: 80
-  - host: phpmyadmin.qrscanner.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: phpmyadmin
-            port:
-              number: 80
