@@ -17,8 +17,8 @@ data:
   DB_USER: "root"
   APP_ENV: "production"
   APP_DEBUG: "false"
-  QR_DOMAIN: "https://qrscanner.local"
-  REACT_APP_API_URL: "https://qrscanner.local/api"
+  QR_DOMAIN: "http://localhost:30080"
+  REACT_APP_API_URL: "http://backend.qrscanner.svc.cluster.local/api"
 
 ---
 apiVersion: v1
