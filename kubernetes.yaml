@@ -1,4 +1,3 @@
----
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -18,7 +17,7 @@ data:
   APP_ENV: "production"
   APP_DEBUG: "false"
   QR_DOMAIN: "http://localhost:30080"
-  REACT_APP_API_URL: "http://backend.qrscanner.svc.cluster.local/api"
+  REACT_APP_API_URL: "http://localhost:30082/api"  # ZMIENIONE - frontend będzie łączył się przez NodePort
 
 ---
 apiVersion: v1
@@ -183,12 +182,13 @@ metadata:
   name: backend
   namespace: qrscanner
 spec:
+  type: NodePort  # ZMIENIONE z ClusterIP na NodePort
   selector:
     app: backend
   ports:
     - port: 80
       targetPort: 9000
-  type: ClusterIP
+      nodePort: 30082  # DODANE - backend dostępny na localhost:30082
 
 ---
 apiVersion: apps/v1
