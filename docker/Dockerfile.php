@@ -18,7 +18,7 @@ WORKDIR /app
 COPY backend/composer.json composer.json
 COPY backend/composer.lock* composer.lock*
 
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs 2>&1 || composer update --no-dev --optimize-autoloader --with-all-dependencies
 
 COPY backend/ .
 

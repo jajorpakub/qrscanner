@@ -4,15 +4,23 @@ namespace App\Controllers;
 
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
-use Firebase\JWT\JWT;
+use Lcobucci\JWT\Configuration;
+use Lcobucci\JWT\Signer\Hmac\Sha256;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use DateTimeImmutable;
 
 class AuthController
 {
     private $db;
+    private $config;
 
     public function __construct($db)
     {
         $this->db = $db;
+        $this->config = Configuration::forSymmetricSigner(
+            new Sha256(),
+            InMemory::plainText(getenv('JWT_SECRET') ?: 'dev-secret-key')
+        );
     }
 
     public function register(Request $request, Response $response): Response
@@ -71,20 +79,17 @@ class AuthController
                 return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
             }
 
-            $token = JWT::encode(
-                [
-                    'userId' => $user['id'],
-                    'email' => $data['email'],
-                    'role' => $user['role'],
-                    'iat' => time(),
-                    'exp' => time() + (24 * 60 * 60) // 24 hours
-                ],
-                getenv('JWT_SECRET'),
-                'HS256'
-            );
+            $now = new DateTimeImmutable();
+            $token = $this->config->builder()
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+24 hours'))
+                ->withClaim('userId', $user['id'])
+                ->withClaim('email', $data['email'])
+                ->withClaim('role', $user['role'])
+                ->getToken($this->config->signer());
 
             $response->getBody()->write(json_encode([
-                'token' => $token,
+                'token' => $token->toString(),
                 'user' => [
                     'id' => $user['id'],
                     'name' => $user['name'],

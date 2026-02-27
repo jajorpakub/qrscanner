@@ -6,10 +6,7 @@
     "php": ">=8.0",
     "slim/slim": "^4.0",
     "slim/psr7": "^1.0",
-    "php-di/php-di": "^7.0",
-    "doctrine/orm": "^3.0",
-    "doctrine/dbal": "^3.0",
-    "firebase/jwt": "^6.0",
+    "lcobucci/jwt": "^5.0",
     "endroid/qr-code": "^5.0",
     "vlucas/phpdotenv": "^5.0"
   },
